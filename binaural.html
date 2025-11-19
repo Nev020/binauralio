@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binaural: Final</title>
+    <style>
+        /* --- COLOR PALETTE VARIABLES --- */
+        :root {
+            --orb-color: #007aff;
+            --user-color: #ff9f0a;
+            --bg-color: #f2f2f7;
+            --surface: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --track-empty: rgba(0, 0, 0, 0.05);
+            --shadow-device: 0 20px 40px -10px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+            --btn-shadow-convex: -6px -6px 14px rgba(255, 255, 255, 1), 6px 6px 10px rgba(0, 0, 0, 0.1);
+            --btn-shadow-concave: inset 3px 3px 6px rgba(0, 0, 0, 0.1), inset -3px -3px 6px rgba(255, 255, 255, 1);
+        }
+
+        /* Dark Mode Overrides */
+        body.dark-mode {
+            --bg-color: #000000;
+            --surface: #1c1c1e;
+            --text-primary: #f2f2f7;
+            --text-secondary: #8e8e93;
+            --track-empty: rgba(255, 255, 255, 0.1);
+            --shadow-device: 0 0 0 1px rgba(255, 255, 255, 0.1);
+            --btn-shadow-convex: 0 10px 20px rgba(0, 0, 0, 0.5);
+            --btn-shadow-concave: inset 0 3px 6px rgba(0, 0, 0, 0.6);
+        }
+
+        /* --- GLOBAL STYLES --- */
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow: hidden;
+            transition: background-color 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Background Orb Glow Effect */
+        body::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 40%, var(--orb-color), transparent 70%);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+            transition: opacity 1s ease;
+        }
+
+        body.dark-mode::after {
+            opacity: 0.1;
+        }
+
+        /* --- DEVICE CONTAINER --- */
+        .device-container {
+            background: var(--surface);
+            width: 85%;
+            max-width: 380px;
+            border-radius: 48px;
+            padding: 50px 30px 40px 30px;
+            box-shadow: var(--shadow-device);
+            text-align: center;
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.5s ease;
+        }
+
+        /* --- VISUAL ORB --- */
+        .orb-container {
+            width: 140px;
+            height: 140px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 15px 0 45px 0;
+        }
+
+        .orb-core {
+            width: 100%;
+            height: 100%;
+            background: var(--orb-color);
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0.6;
+            transform: scale(0.8);
+            transition: background-color 1s ease;
+            will-change: transform, opacity;
+        }
+
+        .orb-core::after {
+            content: '';
+            position: absolute;
+            top: 25%;
+            left: 25%;
+            width: 50%;
+            height: 50%;
+            background: white;
+            border-radius: 50%;
+            filter: blur(15px);
+            opacity: 0.4;
+        }
+
+        /* --- TEXT & STATUS --- */
+        .app-title {
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+            opacity: 0.7;
+        }
+
+        #presetNameInput {
+            background: transparent;
+            border: none;
+            font-family: inherit;
+            font-size: 1.4rem;
+            color: var(--text-primary);
+            text-align: center;
+            width: 100%;
+            margin-bottom: 4px;
+            outline: none;
+            font-weight: 700;
+            caret-color: var(--orb-color);
+            transition: color 0.2s;
+            padding: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .status-readout {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.01em;
+            opacity: 0.9;
+        }
+
+        .divider {
+            margin: 0 6px;
+            opacity: 0.4;
+        }
+
+        /* Fade out UI when playing */
+        .ui-fade {
+            transition: opacity 0.8s ease;
+            width: 100%;
+        }
+
+        body.playing .ui-fade {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        body.playing #toggleBtn {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* --- PRESET BUTTONS --- */
+        .preset-row {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .preset-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--track-empty);
+            border: none;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        /* Default SVG Icon Styling */
+        .preset-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.9;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: stroke 0.2s, fill 0.2s;
+        }
+
+        .preset-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Active Preset Button */
+        .preset-btn.active {
+            background: var(--orb-color);
+            color: #fff;
+            box-shadow: 0 10px 20px -5px var(--orb-color);
+            transform: scale(1.15);
+        }
+
+        /* --- CUSTOM SLIDER PANEL --- */
+        .custom-panel {
+            width: 100%;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+            text-align: left;
+        }
+
+        .custom-panel.visible {
+            max-height: 320px;
+            opacity: 1;
+            margin-bottom: 20px;
+        }
+
+        .slider-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .slider-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            padding-left: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* --- RANGE SLIDER STYLING --- */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            cursor: pointer;
+            height: 28px;
+            margin: 0;
+            display: block;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        /* Track Styling (with custom fill) */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 10px;
+            background: linear-gradient(to right, var(--orb-color) 0%, var(--orb-color) var(--progress), var(--track-empty) var(--progress), var(--track-empty) 100%);
+        }
+
+        /* Thumb Styling */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            margin-top: -9px;
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        /* --- COLOR SWATCHES --- */
+        .color-row {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 20px;
+            padding-top: 20px;
+            padding-bottom: 25px;
+            border-top: 1px solid var(--track-empty);
+        }
+
+        .color-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .color-swatch.active {
+            transform: scale(1.3);
+        }
+
+        .color-swatch.active::after {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 50%;
+            border: 2px solid var(--text-primary);
+            opacity: 0.2;
+        }
+
+        /* --- TOGGLE PLAY/STOP BUTTON --- */
+        #toggleBtn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: var(--surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            box-shadow: var(--btn-shadow-convex);
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #toggleBtn:hover {
+            transform: scale(1.02);
+        }
+
+        /* Inset Shadow when Playing */
+        body.playing #toggleBtn {
+            box-shadow: var(--btn-shadow-concave);
+            transform: scale(0.98);
+        }
+
+        .icon {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+            stroke: none;
+            transition: fill 0.3s;
+        }
+
+        body.playing .icon {
+            fill: var(--orb-color);
+        }
+
+        /* --- MODE SPECIFIC COLORS --- */
+        body.mode-sleep {
+            --orb-color: #645cf0;
+        }
+
+        body.mode-meditate {
+            --orb-color: #5ac8fa;
+        }
+
+        body.mode-focus {
+            --orb-color: #34c759;
+        }
+
+        body.mode-gamma {
+            --orb-color: #ff3b30;
+        }
+
+        body.mode-custom {
+            --orb-color: var(--user-color);
+        }
+    </style>
+</head>
+
+<body class="mode-focus">
+    <div class="device-container">
+        <div class="ui-fade">
+            <div class="app-title">BINAURAL</div>
+            <input type="text" id="presetNameInput" value="Deep Focus" spellcheck="false" readonly>
+            <div class="status-readout">
+                <span id="baseVal">200</span> Hz Tone
+                <span class="divider">·</span>
+                <span id="beatVal">18</span> Hz Beat
+            </div>
+        </div>
+
+        <div class="orb-container">
+            <div class="orb-core" id="visualOrb"></div>
+        </div>
+
+        <div class="ui-fade">
+            <div class="preset-row">
+                <button class="preset-btn" onclick="setPreset('sleep')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M7 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M22 17v-3h-20" />
+                        <path d="M2 8v9" />
+                        <path d="M12 14h10v-2a3 3 0 0 0 -3 -3h-7v5z" />
+                    </svg>
+                </button>
+                <button class="preset-btn" onclick="setPreset('meditate')">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M17 3.5a9 9 0 1 0 4 8.5" />
+                    </svg>
+                </button>
+                <button class="preset-btn active" onclick="setPreset('focus')">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 18h6M10 21h4M9 18a8 8 0 1 1 6 0v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z" />
+                    </svg>
+                </button>
+                <button class="preset-btn" onclick="setPreset('gamma')">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 21v-9c0-2.7-1.5-5-4-6l-3-1 M12 21v-9c0-3 2-6 6-8" />
+                    </svg>
+                </button>
+                <button class="preset-btn" onclick="enableCustomMode()">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="custom-panel" id="customPanel">
+                <div class="slider-group">
+                    <div class="slider-label">Base Tone</div>
+                    <input type="range" id="baseFreq" min="60" max="500" value="200" step="5"
+                        oninput="handleSliderChange(this)">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label">Binaural Beat</div>
+                    <input type="range" id="beatFreq" min="1" max="50" value="18" step="1"
+                        oninput="handleSliderChange(this)">
+                </div>
+                <div class="color-row">
+                    <button class="color-swatch active" style="background: #ff9f0a"
+                        onclick="setCustomColor('#ff9f0a', this)"></button>
+                    <button class="color-swatch" style="background: #ff375f"
+                        onclick="setCustomColor('#ff375f', this)"></button>
+                    <button class="color-swatch" style="background: #30b0c7"
+                        onclick="setCustomColor('#30b0c7', this)"></button>
+                    <button class="color-swatch" style="background: #ffd60a"
+                        onclick="setCustomColor('#ffd60a', this)"></button>
+                    <button class="color-swatch" style="background: #66d4cf"
+                        onclick="setCustomColor('#66d4cf', this)"></button>
+                    <button class="color-swatch" style="background: #64748b"
+                        onclick="setCustomColor('#64748b', this)"></button>
+                </div>
+            </div>
+        </div>
+
+        <button id="toggleBtn" aria-label="Toggle Play">
+            <svg class="icon" id="iconPlay" viewBox="0 0 24 24" style="display:block; fill:currentColor; stroke:none;">
+                <path
+                    d="M8 5.14v14.72a1.25 1.25 0 001.95 1.01l11.33-7.36a1.25 1.25 0 000-2.02L9.95 4.13A1.25 1.25 0 008 5.14z" />
+            </svg>
+            <svg class="icon" id="iconStop" viewBox="0 0 24 24" style="display:none; fill:currentColor; stroke:none;">
+                <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+            </svg>
+        </button>
+    </div>
+
+    <script>
+        /* --- GLOBAL AUDIO VARIABLES --- */
+        let audioCtx, leftOsc, rightOsc, leftPan, rightPan, gainNode;
+        let isPlaying = false;
+        let currentMode = 'focus';
+        let animFrame;
+
+        /* --- DOM ELEMENT REFERENCES --- */
+        const els = {
+            base: document.getElementById('baseFreq'),
+            beat: document.getElementById('beatFreq'),
+            baseDisp: document.getElementById('baseVal'),
+            beatDisp: document.getElementById('beatVal'),
+            nameInput: document.getElementById('presetNameInput'),
+            panel: document.getElementById('customPanel'),
+            btns: document.querySelectorAll('.preset-btn'),
+            swatches: document.querySelectorAll('.color-swatch'),
+            orb: document.getElementById('visualOrb'),
+            btn: document.getElementById('toggleBtn'),
+            iconPlay: document.getElementById('iconPlay'),
+            iconStop: document.getElementById('iconStop')
+        };
+
+        /* --- PRESET CONFIGURATION --- */
+        const presets = {
+            sleep: { base: 110, beat: 3, theme: 'mode-sleep', name: "Deep Sleep", cycle: 10, dark: true },
+            meditate: { base: 160, beat: 10, theme: 'mode-meditate', name: "Meditation", cycle: 6, dark: false },
+            focus: { base: 200, beat: 18, theme: 'mode-focus', name: "Deep Focus", cycle: 4, dark: false },
+            gamma: { base: 250, beat: 40, theme: 'mode-gamma', name: "Gamma", cycle: 0.5, dark: false }
+        };
+
+        /* --- SLIDER LOGIC --- */
+
+        // Initialize slider visual state
+        function initSliders() {
+            updateSliderFill(els.base);
+            updateSliderFill(els.beat);
+        }
+
+        // Visually update the range slider's progress fill
+        function updateSliderFill(slider) {
+            const val = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+            slider.style.setProperty('--progress', val + '%');
+        }
+
+        // Handle changes from the custom mode sliders
+        function handleSliderChange(slider) {
+            if (currentMode !== 'custom') return;
+            updateSliderFill(slider);
+            els.baseDisp.innerText = els.base.value;
+            els.beatDisp.innerText = els.beat.value;
+            updateAudio(0.1);
+        }
+
+        /* --- AUDIO LOGIC --- */
+
+        // Initialize the Web Audio API context
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+
+        // Update oscillator frequencies based on current slider values
+        function updateAudio(rampTime = 0.1) {
+            if (!isPlaying || !audioCtx) return;
+            const now = audioCtx.currentTime;
+            const base = parseFloat(els.base.value);
+            const beat = parseFloat(els.beat.value);
+
+            // Left freq: Base - Beat/2
+            leftOsc.frequency.setTargetAtTime(base - (beat / 2), now, rampTime);
+            // Right freq: Base + Beat/2
+            rightOsc.frequency.setTargetAtTime(base + (beat / 2), now, rampTime);
+        }
+
+        /* --- VISUAL ANIMATION LOGIC --- */
+
+        // Animates the pulsing visual orb
+        function animateOrb() {
+            if (!isPlaying) {
+                // Subtle pulse when stopped
+                const time = Date.now() / 2000;
+                const scale = 0.9 + (0.05 * Math.sin(time));
+                els.orb.style.transform = `scale(${scale})`;
+                els.orb.style.opacity = 0.5;
+            } else {
+                // Beat-synced pulse when playing
+                const now = Date.now() / 1000;
+                // Default to 5s cycle if preset is missing or custom
+                let cycleTime = presets[currentMode] ? presets[currentMode].cycle : 5;
+                const rawSine = Math.sin((now * 2 * Math.PI) / cycleTime);
+
+                let minScale = 0.8;
+                let maxScale = 1.2;
+
+                // Reduce visual intensity for high-frequency Gamma
+                if (currentMode === 'gamma') {
+                    minScale = 0.9;
+                    maxScale = 1.1;
+                }
+
+                const scale = minScale + ((rawSine + 1) / 2) * (maxScale - minScale);
+                els.orb.style.transform = `scale(${scale})`;
+                els.orb.style.opacity = 0.6 + (rawSine * 0.15);
+            }
+
+            animFrame = requestAnimationFrame(animateOrb);
+        }
+
+        /* --- UI CONTROL FUNCTIONS --- */
+
+        // Set the application to a predefined binaural preset
+        function setPreset(key) {
+            currentMode = key;
+            const p = presets[key];
+
+            // Update sliders (visual and actual value)
+            els.base.value = p.base;
+            els.beat.value = p.beat;
+            updateSliderFill(els.base);
+            updateSliderFill(els.beat);
+
+            // Update display text
+            els.baseDisp.innerText = p.base;
+            els.beatDisp.innerText = p.beat;
+
+            // Update Name Input
+            els.nameInput.value = p.name;
+            els.nameInput.readOnly = true;
+
+            // Apply body theme class
+            document.body.className = isPlaying ? 'playing ' + p.theme : p.theme;
+            if (p.dark) document.body.classList.add('dark-mode');
+            else document.body.classList.remove('dark-mode');
+
+            // Hide custom panel and update active button state
+            els.panel.classList.remove('visible');
+            els.btns.forEach(d => d.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            // Immediately update audio if playing
+            if (isPlaying) updateAudio(0.5);
+        }
+
+        // Transition to the custom settings mode
+        function enableCustomMode() {
+            currentMode = 'custom';
+            document.body.className = isPlaying ? 'playing mode-custom' : 'mode-custom';
+            document.body.classList.remove('dark-mode'); // Custom is light mode by default
+
+            // Enable name editing and show sliders
+            els.nameInput.readOnly = false;
+            els.nameInput.value = "Custom Beat";
+            els.panel.classList.add('visible');
+
+            // Update active button state
+            els.btns.forEach(d => d.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            // Focus and select the name input for quick rename
+            setTimeout(() => { els.nameInput.focus(); els.nameInput.select(); }, 100);
+        }
+
+        // Change the visual color for custom mode
+        function setCustomColor(color, el) {
+            document.documentElement.style.setProperty('--user-color', color);
+            els.swatches.forEach(s => s.classList.remove('active'));
+            el.classList.add('active');
+
+            // Automatically switch to custom mode if not already there
+            if (currentMode !== 'custom') enableCustomMode();
+        }
+
+        /* --- PLAYBACK CONTROL --- */
+
+        // Starts or stops the binaural audio playback
+        function togglePlay() {
+            if (!audioCtx) initAudio();
+
+            if (isPlaying) {
+                // --- STOP PLAYBACK ---
+                const now = audioCtx.currentTime;
+                // Ramp gain down to 0
+                gainNode.gain.setTargetAtTime(0, now, 0.5);
+
+                // Stop oscillators and cleanup after ramp completes
+                setTimeout(() => {
+                    leftOsc.stop();
+                    rightOsc.stop();
+                    leftOsc.disconnect();
+                    rightOsc.disconnect();
+                    isPlaying = false;
+                    document.body.classList.remove('playing');
+                    // Switch to Play icon
+                    els.iconPlay.style.display = 'block';
+                    els.iconStop.style.display = 'none';
+                }, 500);
+
+            } else {
+                // --- START PLAYBACK ---
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                // 1. Create Nodes
+                leftOsc = audioCtx.createOscillator();
+                rightOsc = audioCtx.createOscillator();
+                leftPan = audioCtx.createStereoPanner();
+                rightPan = audioCtx.createStereoPanner();
+                gainNode = audioCtx.createGain();
+
+                // 2. Configure Nodes
+                leftOsc.type = rightOsc.type = 'sine';
+                leftPan.pan.value = -1; // Hard left
+                rightPan.pan.value = 1; // Hard right
+                gainNode.gain.value = 0; // Start at 0 volume
+
+                // 3. Connect Graph
+                leftOsc.connect(leftPan).connect(gainNode);
+                rightOsc.connect(rightPan).connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                // 4. Initial Frequencies & Start
+                updateAudio(0);
+                leftOsc.start();
+                rightOsc.start();
+
+                // 5. Ramp up volume
+                gainNode.gain.setTargetAtTime(0.2, audioCtx.currentTime, 1.0);
+
+                isPlaying = true;
+                document.body.classList.add('playing');
+
+                // Re-apply dark mode if the current preset requires it
+                if (presets[currentMode]?.dark) document.body.classList.add('dark-mode');
+
+                // Switch to Stop icon
+                els.iconPlay.style.display = 'none';
+                els.iconStop.style.display = 'block';
+            }
+        }
+
+        /* --- INITIALIZATION --- */
+
+        els.btn.addEventListener('click', togglePlay);
+
+        initSliders();
+        animateOrb();
+    </script>
+</body>
+
+</html>
