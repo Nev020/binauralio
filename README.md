@@ -4,7 +4,7 @@
 
 ---
 
-### I. Clarity.
+### I. Clarity
 
 You do not need to work harder. You need to think **clearer**.
 
@@ -14,7 +14,7 @@ It begins with silence.
 
 ---
 
-### II. Essentialism.
+### II. Essentialism
 
 Design is not simply how it looks, but how it works.
 
@@ -25,7 +25,7 @@ Design is not simply how it looks, but how it works.
 
 ---
 
-### III. Precision.
+### III. Precision
 
 We selected the frequencies because they are true.
 
@@ -43,9 +43,9 @@ The $18 \text{ Hz}$ frequency is not accidental. It is the researched point of o
 
 ---
 
-### IV. The Human Element.
+### IV. The Human Element
 
-1.  Wear **Stereo Headphones**.
+1.  Wear **Headphones**.
 2.  Select your intent.
 3.  Press Play.
 
