@@ -1,6 +1,6 @@
-# BINAURAL.
+# Binaural
 
-## [▶️ Experience It Now](https://nev020.github.io/binauralio/)
+## [▶️ Play](https://nev020.github.io/binauralio/)
 
 ---
 
