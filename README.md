@@ -39,7 +39,7 @@ The goal is **Brainwave Entrainment**—to guide your electrical activity toward
 
 The $18 \text{ Hz}$ frequency is not accidental. It is the researched point of optimal sustained attention.
 
-![Brain wave frequency chart showing Delta, Theta, Alpha, Beta, and Gamma bands](YOUR_DIRECT_IMAGE_URL_HERE)
+![Brain wave frequency chart showing Delta, Theta, Alpha, Beta, and Gamma bands](binaural.jpeg)
 
 ---
 
