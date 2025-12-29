@@ -1,4 +1,4 @@
-# Binaural
+# binauralio
 
 ## [▶️ Play](https://nev020.github.io/binauralio/)
 
