@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Binaural: Final</title>
+    <title>Binaural</title>
     <style>
         /* --- COLOR PALETTE VARIABLES --- */
         :root {
@@ -35,7 +35,7 @@
         /* --- GLOBAL STYLES --- */
         body {
             margin: 0;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -50,9 +50,8 @@
         /* Background Orb Glow Effect */
         body::after {
             content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
+            position: fixed;
+            inset: 0;
             background: radial-gradient(circle at 50% 40%, var(--orb-color), transparent 70%);
             opacity: 0.15;
             pointer-events: none;
@@ -170,6 +169,14 @@
             pointer-events: none;
         }
 
+        /* FIX: keep the custom panel usable while playing — live retuning is the
+           whole point of handleSliderChange(). Opacity on a parent clips children,
+           so the override has to lift the whole .ui-fade block, not just the panel. */
+        body.playing.mode-custom .ui-fade {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         body.playing #toggleBtn {
             opacity: 1;
             pointer-events: all;
@@ -214,6 +221,13 @@
             transform: scale(1.05);
         }
 
+        .preset-btn:focus-visible,
+        .color-swatch:focus-visible,
+        #toggleBtn:focus-visible {
+            outline: 2px solid var(--orb-color);
+            outline-offset: 3px;
+        }
+
         /* Active Preset Button */
         .preset-btn.active {
             background: var(--orb-color);
@@ -244,6 +258,7 @@
         }
 
         .slider-label {
+            display: block;
             font-size: 0.7rem;
             font-weight: 600;
             color: var(--text-secondary);
@@ -256,6 +271,7 @@
         /* --- RANGE SLIDER STYLING --- */
         input[type=range] {
             -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             background: transparent;
             cursor: pointer;
@@ -268,7 +284,12 @@
             outline: none;
         }
 
-        /* Track Styling (with custom fill) */
+        input[type=range]:focus-visible::-webkit-slider-thumb {
+            outline: 2px solid var(--orb-color);
+            outline-offset: 2px;
+        }
+
+        /* Track Styling (with custom fill) — WebKit / Blink */
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
             height: 6px;
@@ -276,9 +297,9 @@
             background: linear-gradient(to right, var(--orb-color) 0%, var(--orb-color) var(--progress), var(--track-empty) var(--progress), var(--track-empty) 100%);
         }
 
-        /* Thumb Styling */
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
+            appearance: none;
             height: 24px;
             width: 24px;
             border-radius: 50%;
@@ -290,6 +311,28 @@
 
         input[type=range]::-webkit-slider-thumb:hover {
             transform: scale(1.1);
+        }
+
+        /* FIX: Gecko equivalents — without these the --progress fill did nothing in Firefox */
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(to right, var(--orb-color) 0%, var(--orb-color) var(--progress), var(--track-empty) var(--progress), var(--track-empty) 100%);
+        }
+
+        input[type=range]::-moz-range-thumb {
+            height: 24px;
+            width: 24px;
+            border: none;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        input[type=range]::-moz-focus-outer {
+            border: 0;
         }
 
         /* --- COLOR SWATCHES --- */
@@ -392,33 +435,37 @@
         .hb {
             display: flex;
             align-items: center;
-            /* Reduced padding for smaller size */
-            padding: 6px 10px; 
-            border-radius: 10px; /* Slightly smaller radius */
+            padding: 6px 10px;
+            border-radius: 10px;
             background: var(--track-empty);
             color: var(--text-secondary);
-            /* Reduced font size for smaller size */
-            font-size: 0.7rem; 
+            font-size: 0.7rem;
             font-weight: 600;
             letter-spacing: 0.5px;
             text-transform: uppercase;
-            margin-bottom: 25px; /* Slightly smaller margin */
-            gap: 5px; /* Slightly smaller gap */
+            margin-bottom: 25px;
+            gap: 5px;
             opacity: 0.8;
             transition: opacity 0.8s ease;
         }
 
         .hb svg {
-            /* Reduced icon size for smaller badge */
             width: 14px;
             height: 14px;
             fill: var(--orb-color);
         }
 
-        /* Hide the badge subtly when playing */
         body.playing .hb {
             opacity: 0;
             pointer-events: none;
+        }
+
+        /* Respect reduced-motion: hold the orb steady */
+        @media (prefers-reduced-motion: reduce) {
+            .orb-core {
+                transform: scale(1) !important;
+                opacity: 0.55 !important;
+            }
         }
     </style>
 </head>
@@ -427,8 +474,9 @@
     <div class="device-container">
         <div class="ui-fade">
             <div class="app-title">BINAURAL</div>
-            <input type="text" id="presetNameInput" value="Deep Focus" spellcheck="false" readonly>
-            <div class="status-readout">
+            <input type="text" id="presetNameInput" value="Deep Focus" spellcheck="false" readonly
+                aria-label="Preset name">
+            <div class="status-readout" aria-live="polite">
                 <span id="baseVal">200</span> Hz Tone
                 <span class="divider">·</span>
                 <span id="beatVal">18</span> Hz Beat
@@ -436,37 +484,42 @@
         </div>
 
         <div class="orb-container">
-            <div class="orb-core" id="visualOrb"></div>
+            <div class="orb-core" id="visualOrb" aria-hidden="true"></div>
         </div>
 
         <div class="ui-fade">
-            <div class="preset-row">
-                <button class="preset-btn" onclick="setPreset('sleep')">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <div class="preset-row" role="group" aria-label="Presets">
+                <button class="preset-btn" aria-label="Deep Sleep preset" aria-pressed="false"
+                    onclick="setPreset('sleep', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M7 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
                         <path d="M22 17v-3h-20" />
                         <path d="M2 8v9" />
                         <path d="M12 14h10v-2a3 3 0 0 0 -3 -3h-7v5z" />
                     </svg>
                 </button>
-                <button class="preset-btn" onclick="setPreset('meditate')">
-                    <svg viewBox="0 0 24 24">
+                <button class="preset-btn" aria-label="Meditation preset" aria-pressed="false"
+                    onclick="setPreset('meditate', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M17 3.5a9 9 0 1 0 4 8.5" />
                     </svg>
                 </button>
-                <button class="preset-btn active" onclick="setPreset('focus')">
-                    <svg viewBox="0 0 24 24">
+                <button class="preset-btn active" aria-label="Deep Focus preset" aria-pressed="true"
+                    onclick="setPreset('focus', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M9 18h6M10 21h4M9 18a8 8 0 1 1 6 0v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z" />
                     </svg>
                 </button>
-                <button class="preset-btn" onclick="setPreset('gamma')">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                <button class="preset-btn" aria-label="Gamma preset" aria-pressed="false"
+                    onclick="setPreset('gamma', this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 21v-9c0-2.7-1.5-5-4-6l-3-1 M12 21v-9c0-3 2-6 6-8" />
                     </svg>
                 </button>
-                <button class="preset-btn" onclick="enableCustomMode()">
-                    <svg viewBox="0 0 24 24">
+                <button class="preset-btn" id="customBtn" aria-label="Custom preset" aria-pressed="false"
+                    onclick="enableCustomMode(this)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
@@ -475,43 +528,48 @@
 
             <div class="custom-panel" id="customPanel">
                 <div class="slider-group">
-                    <div class="slider-label">Base Tone</div>
-                    <input type="range" id="baseFreq" min="60" max="500" value="200" step="5"
+                    <label class="slider-label" for="baseFreq">Base Tone</label>
+                    <input type="range" id="baseFreq" min="100" max="500" value="200" step="5"
                         oninput="handleSliderChange(this)">
                 </div>
                 <div class="slider-group">
-                    <div class="slider-label">Binaural Beat</div>
+                    <label class="slider-label" for="beatFreq">Binaural Beat</label>
                     <input type="range" id="beatFreq" min="1" max="50" value="18" step="1"
                         oninput="handleSliderChange(this)">
                 </div>
-                <div class="color-row">
-                    <button class="color-swatch active" style="background: #ff9f0a"
+                <div class="color-row" role="group" aria-label="Accent color">
+                    <button class="color-swatch active" aria-label="Orange" style="background: #ff9f0a"
                         onclick="setCustomColor('#ff9f0a', this)"></button>
-                    <button class="color-swatch" style="background: #ff375f"
+                    <button class="color-swatch" aria-label="Pink" style="background: #ff375f"
                         onclick="setCustomColor('#ff375f', this)"></button>
-                    <button class="color-swatch" style="background: #30b0c7"
+                    <button class="color-swatch" aria-label="Teal" style="background: #30b0c7"
                         onclick="setCustomColor('#30b0c7', this)"></button>
-                    <button class="color-swatch" style="background: #ffd60a"
+                    <button class="color-swatch" aria-label="Yellow" style="background: #ffd60a"
                         onclick="setCustomColor('#ffd60a', this)"></button>
-                    <button class="color-swatch" style="background: #66d4cf"
+                    <button class="color-swatch" aria-label="Mint" style="background: #66d4cf"
                         onclick="setCustomColor('#66d4cf', this)"></button>
-                    <button class="color-swatch" style="background: #64748b"
+                    <button class="color-swatch" aria-label="Slate" style="background: #64748b"
                         onclick="setCustomColor('#64748b', this)"></button>
                 </div>
             </div>
         </div>
-        
+
         <div class="hb">
-            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-3v8h3c1.66 0 3-1.34 3-3v-7c0-5.52-4.48-10-10-10z"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                    d="M12 2C6.48 2 2 6.48 2 12v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-3v8h3c1.66 0 3-1.34 3-3v-7c0-5.52-4.48-10-10-10z" />
+            </svg>
             Headphones Required
         </div>
 
-        <button id="toggleBtn" aria-label="Toggle Play">
-            <svg class="icon" id="iconPlay" viewBox="0 0 24 24" style="display:block; fill:currentColor; stroke:none;">
+        <button id="toggleBtn" aria-label="Play" aria-pressed="false">
+            <svg class="icon" id="iconPlay" viewBox="0 0 24 24" aria-hidden="true"
+                style="display:block; fill:currentColor; stroke:none;">
                 <path
                     d="M8 5.14v14.72a1.25 1.25 0 001.95 1.01l11.33-7.36a1.25 1.25 0 000-2.02L9.95 4.13A1.25 1.25 0 008 5.14z" />
             </svg>
-            <svg class="icon" id="iconStop" viewBox="0 0 24 24" style="display:none; fill:currentColor; stroke:none;">
+            <svg class="icon" id="iconStop" viewBox="0 0 24 24" aria-hidden="true"
+                style="display:none; fill:currentColor; stroke:none;">
                 <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
             </svg>
         </button>
@@ -524,6 +582,10 @@
         let currentMode = 'focus';
         let animFrame;
 
+        const VOLUME = 0.2;
+        const FADE_TC = 0.08;   // gain time constant (NOT a duration — see stopPlayback)
+        const FADE_MS = 400;    // ~5 time constants: gain is effectively 0 by here
+
         /* --- DOM ELEMENT REFERENCES --- */
         const els = {
             base: document.getElementById('baseFreq'),
@@ -532,6 +594,7 @@
             beatDisp: document.getElementById('beatVal'),
             nameInput: document.getElementById('presetNameInput'),
             panel: document.getElementById('customPanel'),
+            customBtn: document.getElementById('customBtn'),
             btns: document.querySelectorAll('.preset-btn'),
             swatches: document.querySelectorAll('.color-swatch'),
             orb: document.getElementById('visualOrb'),
@@ -539,6 +602,8 @@
             iconPlay: document.getElementById('iconPlay'),
             iconStop: document.getElementById('iconStop')
         };
+
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         /* --- PRESET CONFIGURATION --- */
         const presets = {
@@ -550,19 +615,16 @@
 
         /* --- SLIDER LOGIC --- */
 
-        // Initialize slider visual state
         function initSliders() {
             updateSliderFill(els.base);
             updateSliderFill(els.beat);
         }
 
-        // Visually update the range slider's progress fill
         function updateSliderFill(slider) {
             const val = (slider.value - slider.min) / (slider.max - slider.min) * 100;
             slider.style.setProperty('--progress', val + '%');
         }
 
-        // Handle changes from the custom mode sliders
         function handleSliderChange(slider) {
             if (currentMode !== 'custom') return;
             updateSliderFill(slider);
@@ -573,39 +635,45 @@
 
         /* --- AUDIO LOGIC --- */
 
-        // Initialize the Web Audio API context
         function initAudio() {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
         }
 
-        // Update oscillator frequencies based on current slider values
-        function updateAudio(rampTime = 0.1) {
-            if (!isPlaying || !audioCtx) return;
+        /**
+         * Push the current slider values into the oscillators.
+         * `timeConstant` is a setTargetAtTime time constant, not a ramp duration;
+         * pass 0 for an immediate jump (used at start-up).
+         */
+        function updateAudio(timeConstant = 0.1) {
+            if (!isPlaying || !audioCtx || !leftOsc || !rightOsc) return;
             const now = audioCtx.currentTime;
             const base = parseFloat(els.base.value);
             const beat = parseFloat(els.beat.value);
+            const lf = base - (beat / 2);   // left ear
+            const rf = base + (beat / 2);   // right ear
 
-            // Left freq: Base - Beat/2
-            leftOsc.frequency.setTargetAtTime(base - (beat / 2), now, rampTime);
-            // Right freq: Base + Beat/2
-            rightOsc.frequency.setTargetAtTime(base + (beat / 2), now, rampTime);
+            if (timeConstant <= 0) {
+                leftOsc.frequency.setValueAtTime(lf, now);
+                rightOsc.frequency.setValueAtTime(rf, now);
+            } else {
+                leftOsc.frequency.setTargetAtTime(lf, now, timeConstant);
+                rightOsc.frequency.setTargetAtTime(rf, now, timeConstant);
+            }
         }
 
         /* --- VISUAL ANIMATION LOGIC --- */
 
-        // Animates the pulsing visual orb
         function animateOrb() {
+            if (reduceMotion) return;   // CSS holds the orb steady
+
             if (!isPlaying) {
-                // Subtle pulse when stopped
                 const time = Date.now() / 2000;
                 const scale = 0.9 + (0.05 * Math.sin(time));
                 els.orb.style.transform = `scale(${scale})`;
                 els.orb.style.opacity = 0.5;
             } else {
-                // Beat-synced pulse when playing
                 const now = Date.now() / 1000;
-                // Default to 5s cycle if preset is missing or custom
                 let cycleTime = presets[currentMode] ? presets[currentMode].cycle : 5;
                 const rawSine = Math.sin((now * 2 * Math.PI) / cycleTime);
 
@@ -628,133 +696,151 @@
 
         /* --- UI CONTROL FUNCTIONS --- */
 
-        // Set the application to a predefined binaural preset
-        function setPreset(key) {
+        // FIX: the active button is passed in explicitly. The old code read a bare
+        // `event.currentTarget`, which relies on the non-standard window.event global
+        // and throws a ReferenceError in Firefox, aborting the rest of the function.
+        function markActive(el) {
+            els.btns.forEach(d => {
+                d.classList.remove('active');
+                d.setAttribute('aria-pressed', 'false');
+            });
+            if (el) {
+                el.classList.add('active');
+                el.setAttribute('aria-pressed', 'true');
+            }
+        }
+
+        function setPreset(key, el) {
             currentMode = key;
             const p = presets[key];
 
-            // Update sliders (visual and actual value)
             els.base.value = p.base;
             els.beat.value = p.beat;
             updateSliderFill(els.base);
             updateSliderFill(els.beat);
 
-            // Update display text
             els.baseDisp.innerText = p.base;
             els.beatDisp.innerText = p.beat;
 
-            // Update Name Input
             els.nameInput.value = p.name;
             els.nameInput.readOnly = true;
 
-            // Apply body theme class
             document.body.className = isPlaying ? 'playing ' + p.theme : p.theme;
             if (p.dark) document.body.classList.add('dark-mode');
             else document.body.classList.remove('dark-mode');
 
-            // Hide custom panel and update active button state
             els.panel.classList.remove('visible');
-            els.btns.forEach(d => d.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            markActive(el);
 
-            // Immediately update audio if playing
             if (isPlaying) updateAudio(0.5);
         }
 
-        // Transition to the custom settings mode
-        function enableCustomMode() {
+        function enableCustomMode(el) {
             currentMode = 'custom';
             document.body.className = isPlaying ? 'playing mode-custom' : 'mode-custom';
-            document.body.classList.remove('dark-mode'); // Custom is light mode by default
+            document.body.classList.remove('dark-mode');
 
-            // Enable name editing and show sliders
             els.nameInput.readOnly = false;
-            els.nameInput.value = "Custom Beat";
+            if (els.nameInput.value !== "Custom Beat") els.nameInput.value = "Custom Beat";
             els.panel.classList.add('visible');
 
-            // Update active button state
-            els.btns.forEach(d => d.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            // FIX: default to the "+" button, so entering custom mode via a color
+            // swatch no longer leaves every preset button unhighlighted.
+            markActive(el || els.customBtn);
 
-            // Focus and select the name input for quick rename
             setTimeout(() => { els.nameInput.focus(); els.nameInput.select(); }, 100);
         }
 
-        // Change the visual color for custom mode
         function setCustomColor(color, el) {
             document.documentElement.style.setProperty('--user-color', color);
             els.swatches.forEach(s => s.classList.remove('active'));
             el.classList.add('active');
 
-            // Automatically switch to custom mode if not already there
-            if (currentMode !== 'custom') enableCustomMode();
+            if (currentMode !== 'custom') enableCustomMode(els.customBtn);
         }
 
         /* --- PLAYBACK CONTROL --- */
 
-        // Starts or stops the binaural audio playback
+        function setPlayingUI(playing) {
+            els.iconPlay.style.display = playing ? 'none' : 'block';
+            els.iconStop.style.display = playing ? 'block' : 'none';
+            els.btn.setAttribute('aria-label', playing ? 'Stop' : 'Play');
+            els.btn.setAttribute('aria-pressed', String(playing));
+        }
+
+        function startPlayback() {
+            // 1. Create Nodes
+            leftOsc = audioCtx.createOscillator();
+            rightOsc = audioCtx.createOscillator();
+            leftPan = audioCtx.createStereoPanner();
+            rightPan = audioCtx.createStereoPanner();
+            gainNode = audioCtx.createGain();
+
+            // 2. Configure Nodes
+            leftOsc.type = rightOsc.type = 'sine';
+            leftPan.pan.value = -1; // Hard left
+            rightPan.pan.value = 1; // Hard right
+            gainNode.gain.value = 0;
+
+            // 3. Connect Graph
+            leftOsc.connect(leftPan).connect(gainNode);
+            rightOsc.connect(rightPan).connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // 4. FIX: flag must be set BEFORE updateAudio, which early-returns on
+            // !isPlaying. Previously it bailed out here and both oscillators stayed
+            // at the 440 Hz default — identical in both ears, so there was no
+            // binaural beat at all until you touched a control.
+            isPlaying = true;
+            updateAudio(0);
+
+            leftOsc.start();
+            rightOsc.start();
+            gainNode.gain.setTargetAtTime(VOLUME, audioCtx.currentTime, 0.4);
+
+            document.body.classList.add('playing');
+            if (presets[currentMode] && presets[currentMode].dark) {
+                document.body.classList.add('dark-mode');
+            }
+            setPlayingUI(true);
+        }
+
+        function stopPlayback() {
+            const now = audioCtx.currentTime;
+
+            // Capture the current graph locally so a quick restart can build a new
+            // one without this teardown reaching into it.
+            const l = leftOsc, r = rightOsc, lp = leftPan, rp = rightPan, g = gainNode;
+            leftOsc = rightOsc = leftPan = rightPan = gainNode = null;
+
+            g.gain.cancelScheduledValues(now);
+            g.gain.setValueAtTime(g.gain.value, now);
+            // FIX: 0.08 time constant reaches ~0 within FADE_MS. The old code used a
+            // 0.5 constant and cut the oscillators at 500 ms, i.e. while gain was
+            // still ~0.07 — an audible click.
+            g.gain.setTargetAtTime(0, now, FADE_TC);
+
+            // FIX: state flips immediately, so a second click inside the fade window
+            // starts playback instead of re-entering the stop branch.
+            isPlaying = false;
+            document.body.classList.remove('playing');
+            setPlayingUI(false);
+
+            setTimeout(() => {
+                try { l.stop(); r.stop(); } catch (e) { /* already stopped */ }
+                // FIX: disconnect the whole chain, not just the oscillators —
+                // panners and gain nodes used to accumulate on every play.
+                l.disconnect(); r.disconnect();
+                lp.disconnect(); rp.disconnect(); g.disconnect();
+            }, FADE_MS);
+        }
+
         function togglePlay() {
             if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
 
-            if (isPlaying) {
-                // --- STOP PLAYBACK ---
-                const now = audioCtx.currentTime;
-                // Ramp gain down to 0
-                gainNode.gain.setTargetAtTime(0, now, 0.5);
-
-                // Stop oscillators and cleanup after ramp completes
-                setTimeout(() => {
-                    leftOsc.stop();
-                    rightOsc.stop();
-                    leftOsc.disconnect();
-                    rightOsc.disconnect();
-                    isPlaying = false;
-                    document.body.classList.remove('playing');
-                    // Switch to Play icon
-                    els.iconPlay.style.display = 'block';
-                    els.iconStop.style.display = 'none';
-                }, 500);
-
-            } else {
-                // --- START PLAYBACK ---
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-
-                // 1. Create Nodes
-                leftOsc = audioCtx.createOscillator();
-                rightOsc = audioCtx.createOscillator();
-                leftPan = audioCtx.createStereoPanner();
-                rightPan = audioCtx.createStereoPanner();
-                gainNode = audioCtx.createGain();
-
-                // 2. Configure Nodes
-                leftOsc.type = rightOsc.type = 'sine';
-                leftPan.pan.value = -1; // Hard left
-                rightPan.pan.value = 1; // Hard right
-                gainNode.gain.value = 0; // Start at 0 volume
-
-                // 3. Connect Graph
-                leftOsc.connect(leftPan).connect(gainNode);
-                rightOsc.connect(rightPan).connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-
-                // 4. Initial Frequencies & Start
-                updateAudio(0);
-                leftOsc.start();
-                rightOsc.start();
-
-                // 5. Ramp up volume
-                gainNode.gain.setTargetAtTime(0.2, audioCtx.currentTime, 1.0);
-
-                isPlaying = true;
-                document.body.classList.add('playing');
-
-                // Re-apply dark mode if the current preset requires it
-                if (presets[currentMode]?.dark) document.body.classList.add('dark-mode');
-
-                // Switch to Stop icon
-                els.iconPlay.style.display = 'none';
-                els.iconStop.style.display = 'block';
-            }
+            if (isPlaying) stopPlayback();
+            else startPlayback();
         }
 
         /* --- INITIALIZATION --- */
@@ -762,6 +848,7 @@
         els.btn.addEventListener('click', togglePlay);
 
         initSliders();
+        setPlayingUI(false);
         animateOrb();
     </script>
 </body>
